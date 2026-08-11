@@ -175,29 +175,87 @@ def normalizar_documento(d):
     if pd.isna(d) or d is None:
         return ""
     s = str(d).strip()
-    # Remove zeros à esquerda, mas mantém "0" se for só zeros
     s = s.lstrip("0") or "0"
     return s
 
-def preparar_financeiro(df: pd.DataFrame) -> pd.DataFrame:
-    """Prepara planilha Financeiro."""
-    # Detecta colunas de forma flexível
+def _encontrar_linha_cabecalho(df_raw: pd.DataFrame, palavras_chave: list) -> int:
+    """Procura a linha que contém o cabeçalho real (quando há títulos acima)."""
+    for i in range(min(30, len(df_raw))):
+        row_vals = [str(v).lower().strip() for v in df_raw.iloc[i].tolist()]
+        row_text = " | ".join(row_vals)
+        hits = sum(1 for p in palavras_chave if p in row_text)
+        if hits >= 2:
+            return i
+    return 0
+
+
+def _mapear_colunas(df: pd.DataFrame, tipo: str) -> dict:
+    """Mapeia colunas de forma flexível (aceita variações de nome)."""
     col_map = {}
     for col in df.columns:
         col_lower = str(col).lower().strip()
-        if "título" in col_lower or "titulo" in col_lower or col_lower == "título":
-            col_map["documento"] = col
-        elif "valor movto" in col_lower or "valor" in col_lower and "movto" in col_lower:
-            col_map["valor"] = col
-        elif "dat transac" in col_lower or "data" in col_lower:
-            col_map["data"] = col
-        elif "série" in col_lower or "serie" in col_lower:
-            col_map["serie"] = col
+        if tipo == "financeiro":
+            if any(x in col_lower for x in ["título", "titulo", "title"]):
+                col_map["documento"] = col
+            elif "valor movto" in col_lower or ("valor" in col_lower and "movto" in col_lower):
+                col_map["valor"] = col
+            elif "valor" in col_lower and "documento" not in col_map:
+                if "valor" not in col_map:
+                    col_map["valor"] = col
+            elif any(x in col_lower for x in ["dat transac", "data transac", "dat_transac"]):
+                col_map["data"] = col
+            elif col_lower.startswith("data") or "data" in col_lower:
+                if "data" not in col_map:
+                    col_map["data"] = col
+            elif any(x in col_lower for x in ["série", "serie", "series"]):
+                col_map["serie"] = col
+        else:  # recebimento
+            if "documento" in col_lower:
+                col_map["documento"] = col
+            elif any(x in col_lower for x in ["crédito", "credito", "credito"]):
+                col_map["valor"] = col
+            elif "valor" in col_lower and "valor" not in col_map:
+                col_map["valor"] = col
+            elif any(x in col_lower for x in ["data trans", "data_trans"]):
+                col_map["data"] = col
+            elif col_lower.startswith("data") or "data" in col_lower:
+                if "data" not in col_map:
+                    col_map["data"] = col
+            elif any(x in col_lower for x in ["série", "serie", "series"]):
+                col_map["serie"] = col
+    return col_map
+
+
+def _ler_excel_robusto(file_or_path, sheet_name=0) -> pd.DataFrame:
+    """Lê Excel tentando detectar a linha de cabeçalho automaticamente."""
+    df = pd.read_excel(file_or_path, sheet_name=sheet_name, header=0)
+    cols_str = " ".join(str(c).lower() for c in df.columns)
+
+    if all(str(c).startswith("Unnamed") for c in df.columns) or (
+        "título" not in cols_str and "titulo" not in cols_str and "documento" not in cols_str
+        and "valor" not in cols_str and "crédito" not in cols_str and "credito" not in cols_str
+    ):
+        df_raw = pd.read_excel(file_or_path, sheet_name=sheet_name, header=None)
+        palavras = ["título", "titulo", "documento", "valor", "crédito", "credito", "data", "série", "serie"]
+        header_row = _encontrar_linha_cabecalho(df_raw, palavras)
+        df = pd.read_excel(file_or_path, sheet_name=sheet_name, header=header_row)
+
+    df = df.dropna(axis=1, how="all")
+    return df
+
+
+def preparar_financeiro(df: pd.DataFrame) -> pd.DataFrame:
+    """Prepara planilha Financeiro."""
+    col_map = _mapear_colunas(df, "financeiro")
 
     required = ["documento", "valor", "data"]
     missing = [r for r in required if r not in col_map]
     if missing:
-        raise ValueError(f"Colunas obrigatórias não encontradas no Financeiro: {missing}. Colunas disponíveis: {list(df.columns)}")
+        raise ValueError(
+            f"Colunas obrigatórias não encontradas no Financeiro: {missing}. "
+            f"Colunas disponíveis: {list(df.columns)}. "
+            f"Verifique se o arquivo tem as colunas Título, Valor Movto e Dat Transac."
+        )
 
     out = pd.DataFrame()
     out["Documento"] = df[col_map["documento"]].apply(normalizar_documento)
@@ -205,26 +263,22 @@ def preparar_financeiro(df: pd.DataFrame) -> pd.DataFrame:
     out["Valor"] = pd.to_numeric(df[col_map["valor"]], errors="coerce").fillna(0)
     out["Data"] = pd.to_datetime(df[col_map["data"]], errors="coerce")
     out["Chave"] = out["Documento"] + "|" + out["Série"]
-    return out
+    out = out[out["Documento"].astype(str).str.len() > 0]
+    return out.reset_index(drop=True)
+
 
 def preparar_recebimento(df: pd.DataFrame) -> pd.DataFrame:
     """Prepara planilha Recebimento."""
-    col_map = {}
-    for col in df.columns:
-        col_lower = str(col).lower().strip()
-        if "documento" in col_lower:
-            col_map["documento"] = col
-        elif "crédito" in col_lower or "credito" in col_lower:
-            col_map["valor"] = col
-        elif "data trans" in col_lower or ( "data" in col_lower and "trans" in col_lower):
-            col_map["data"] = col
-        elif "série" in col_lower or "serie" in col_lower:
-            col_map["serie"] = col
+    col_map = _mapear_colunas(df, "recebimento")
 
     required = ["documento", "valor", "data"]
     missing = [r for r in required if r not in col_map]
     if missing:
-        raise ValueError(f"Colunas obrigatórias não encontradas no Recebimento: {missing}. Colunas disponíveis: {list(df.columns)}")
+        raise ValueError(
+            f"Colunas obrigatórias não encontradas no Recebimento: {missing}. "
+            f"Colunas disponíveis: {list(df.columns)}. "
+            f"Verifique se o arquivo tem as colunas Documento, Crédito e Data Trans."
+        )
 
     out = pd.DataFrame()
     out["Documento"] = df[col_map["documento"]].apply(normalizar_documento)
@@ -232,7 +286,8 @@ def preparar_recebimento(df: pd.DataFrame) -> pd.DataFrame:
     out["Valor"] = pd.to_numeric(df[col_map["valor"]], errors="coerce").fillna(0)
     out["Data"] = pd.to_datetime(df[col_map["data"]], errors="coerce")
     out["Chave"] = out["Documento"] + "|" + out["Série"]
-    return out
+    out = out[out["Documento"].astype(str).str.len() > 0]
+    return out.reset_index(drop=True)
 
 def conciliar(df_fin: pd.DataFrame, df_rec: pd.DataFrame, tolerancia: float = 0.02) -> dict:
     """
@@ -240,12 +295,11 @@ def conciliar(df_fin: pd.DataFrame, df_rec: pd.DataFrame, tolerancia: float = 0.
     Chave única = Documento + Série
     Duplicados são sumarizados.
     """
-    # Agrega por chave
     fin_agg = df_fin.groupby("Chave").agg(
         Documento=("Documento", "first"),
         Série=("Série", "first"),
         Valor_Financeiro=("Valor", "sum"),
-        Data_Financeiro=("Data", "min"),  # usa a data mais antiga
+        Data_Financeiro=("Data", "min"),
         Qtd_Linhas_Fin=("Valor", "count")
     ).reset_index()
 
@@ -257,7 +311,6 @@ def conciliar(df_fin: pd.DataFrame, df_rec: pd.DataFrame, tolerancia: float = 0.
         Qtd_Linhas_Rec=("Valor", "count")
     ).reset_index()
 
-    # Merge outer
     merged = pd.merge(
         fin_agg, rec_agg,
         on=["Chave", "Documento", "Série"],
@@ -281,7 +334,6 @@ def conciliar(df_fin: pd.DataFrame, df_rec: pd.DataFrame, tolerancia: float = 0.
 
     merged["Tipo"] = merged.apply(classificar, axis=1)
 
-    # Divergências
     divergencias = merged[merged["Tipo"] != "OK"].copy()
     divergencias = divergencias.rename(columns={
         "Data_Financeiro": "Data Financeiro",
@@ -322,7 +374,6 @@ def main():
     st.title("⚖️ Conciliação Transitoria de Fornecedores")
     st.caption("Conta 91001001 • Estabelecimentos 101 / 103 / 104 / 106")
 
-    # Sidebar
     with st.sidebar:
         st.header("Navegação")
         pagina = st.radio(
@@ -336,9 +387,6 @@ def main():
         st.markdown("---")
         st.caption("Protótipo v1.0 • Opção A")
 
-    # ========================================================
-    # PÁGINA: NOVA CONCILIAÇÃO
-    # ========================================================
     if pagina == "Nova Conciliação":
         st.subheader("Nova Conciliação")
 
@@ -376,25 +424,20 @@ def main():
 
             with st.spinner("Processando planilhas..."):
                 try:
-                    # Lê Financeiro
-                    df_fin_raw = pd.read_excel(file_fin, header=0)
+                    df_fin_raw = _ler_excel_robusto(file_fin)
                     df_fin = preparar_financeiro(df_fin_raw)
 
-                    # Lê Recebimento (pode ter múltiplas abas)
                     xls_rec = pd.ExcelFile(file_rec)
-                    # Tenta achar a aba principal
                     sheet_rec = xls_rec.sheet_names[0]
                     for s in xls_rec.sheet_names:
-                        if "ce0403" in s.lower() or "receb" in s.lower() or s == xls_rec.sheet_names[0]:
+                        if "ce0403" in s.lower() or "receb" in s.lower():
                             sheet_rec = s
                             break
-                    df_rec_raw = pd.read_excel(file_rec, sheet_name=sheet_rec, header=0)
+                    df_rec_raw = _ler_excel_robusto(file_rec, sheet_name=sheet_rec)
                     df_rec = preparar_recebimento(df_rec_raw)
 
-                    # Executa conciliação
                     resultado = conciliar(df_fin, df_rec, tolerancia=tolerancia)
 
-                    # Salva arquivos
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                     nome_fin = f"{estabelecimento}_Financeiro_{ts}_{file_fin.name}"
                     nome_rec = f"{estabelecimento}_Recebimentos_{ts}_{file_rec.name}"
@@ -403,7 +446,6 @@ def main():
                     with open(UPLOAD_DIR / nome_rec, "wb") as f:
                         f.write(file_rec.getvalue())
 
-                    # Monta meta e salva histórico
                     meta = {
                         "estabelecimento": estabelecimento,
                         "periodo": periodo,
@@ -426,11 +468,9 @@ def main():
 
                     st.success(f"Conciliação salva no histórico (ID #{conc_id})")
 
-                    # ========== RESULTADOS ==========
                     st.markdown("---")
                     st.subheader("📊 Resultado da Conciliação")
 
-                    # Cards de resumo
                     m1, m2, m3, m4 = st.columns(4)
                     m1.metric("Total Financeiro", f"R$ {resultado['total_financeiro']:,.2f}")
                     m2.metric("Total Recebimento", f"R$ {resultado['total_recebimento']:,.2f}")
@@ -444,12 +484,10 @@ def main():
                     c3.metric("Só no Financeiro", resultado["qtd_so_financeiro"])
                     c4.metric("Só no Recebimento", resultado["qtd_so_recebimento"])
 
-                    # Tabela de divergências
                     if resultado["qtd_divergencias"] > 0:
                         st.markdown("### ⚠️ Divergências encontradas")
                         div = resultado["divergencias"].copy()
 
-                        # Formata datas e valores
                         for col in ["Data Financeiro", "Data Recebimento"]:
                             if col in div.columns:
                                 div[col] = pd.to_datetime(div[col], errors="coerce").dt.strftime("%d/%m/%Y")
@@ -459,7 +497,6 @@ def main():
 
                         st.dataframe(div, use_container_width=True, hide_index=True)
 
-                        # Download
                         buffer = io.BytesIO()
                         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
                             resultado["divergencias"].to_excel(writer, index=False, sheet_name="Divergencias")
@@ -472,16 +509,12 @@ def main():
                     else:
                         st.success("✅ Nenhuma divergência encontrada! Contas batem perfeitamente.")
 
-                    # Aviso de chave
                     st.info("🔑 A chave de comparação é **Documento + Série**. Documentos com a mesma numeração e séries diferentes são tratados como itens distintos.")
 
                 except Exception as e:
                     st.error(f"Erro ao processar: {str(e)}")
                     st.exception(e)
 
-    # ========================================================
-    # PÁGINA: HISTÓRICO
-    # ========================================================
     else:
         st.subheader("📜 Histórico de Conciliações")
 
@@ -491,7 +524,6 @@ def main():
         if hist.empty:
             st.info("Nenhuma conciliação realizada ainda.")
         else:
-            # Formata para exibição
             hist_view = hist.copy()
             hist_view["data_execucao"] = pd.to_datetime(hist_view["data_execucao"]).dt.strftime("%d/%m/%Y %H:%M")
             hist_view["total_financeiro"] = hist_view["total_financeiro"].apply(lambda x: f"R$ {x:,.2f}")
@@ -522,7 +554,6 @@ def main():
                     st.success("Sem divergências nesta conciliação.")
                 else:
                     st.markdown(f"**{len(divs)} divergência(s):**")
-                    # Formata
                     for col in ["data_financeiro", "data_recebimento"]:
                         if col in divs.columns:
                             divs[col] = pd.to_datetime(divs[col], errors="coerce").dt.strftime("%d/%m/%Y")
