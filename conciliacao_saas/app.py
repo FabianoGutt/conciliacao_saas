@@ -1775,7 +1775,7 @@ if pagina == "Nova Conciliação":
     # HISTÓRICO
     # ========================================================
 
-        else:
+    else:
 
         st.subheader(
             "📜 Histórico de Conciliações"
