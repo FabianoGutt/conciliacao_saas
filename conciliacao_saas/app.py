@@ -1790,22 +1790,14 @@ def main():
 
 
             selected_id = st.selectbox(
-                "Selecione o ID",
-                ids,
-                format_func=lambda x:
-                    (
-                        f"#{x} — "
-                        f"{hist.loc["
-                            hist['id'] == x,
-                            'estabelecimento'
-                        ].values[0]}"
-                        f" — "
-                        f"{hist.loc["
-                            hist['id'] == x,
-                            'periodo'
-                        ].values[0]}"
-                    )
-            )
+    "Selecione o ID",
+    ids,
+    format_func=lambda x: (
+        f"#{x} — "
+        f"{hist.loc[hist['id'] == x, 'estabelecimento'].values[0]} — "
+        f"{hist.loc[hist['id'] == x, 'periodo'].values[0]}"
+    )
+)
 
 
             if selected_id:
