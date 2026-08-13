@@ -1235,7 +1235,7 @@ def main():
         "Conta 91001001 • Estabelecimentos 101 / 103 / 104 / 106"
     )
 
-    with st.sidebar:
+        with st.sidebar:
 
         st.header("Navegação")
 
@@ -1252,23 +1252,21 @@ def main():
 
         st.markdown("**Conta contábil**")
 
-st.markdown(
-    """
-    <div class="conta-contabil">
-        <div class="conta-numero">91001001</div>
-        <div class="conta-descricao">
-            TRANSITORIA DE FORNECEDORES
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+        st.markdown(
+            """
+            <div class="conta-contabil">
+                <div class="conta-numero">91001001</div>
+                <div class="conta-descricao">
+                    TRANSITORIA DE FORNECEDORES
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         st.markdown("---")
 
-        st.caption(
-            "Protótipo v1.0 • Opção A"
-        )
+        st.caption("Protótipo v1.0 • Opção A")
 
 
     # ========================================================
