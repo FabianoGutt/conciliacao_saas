@@ -1814,23 +1814,23 @@ def main():
             ids = hist["id"].tolist()
 
 
-            selected_id = st.selectbox(
-                "Selecione o ID",
-                ids,
-                format_func=lambda x:
-                    (
-                        f"#{x} — "
-                        f"{hist.loc["
-                            hist['id'] == x,
-                            'estabelecimento'
-                        ].values[0]}"
-                        f" — "
-                        f"{hist.loc["
-                            hist['id'] == x,
-                            'periodo'
-                        ].values[0]}"
-                    )
-            )
+            ids = hist["id"].tolist()
+
+
+def formatar_conciliacao(x):
+    linha = hist[hist["id"] == x].iloc[0]
+
+    estabelecimento = linha["estabelecimento"]
+    periodo = linha["periodo"]
+
+    return f"#{x} — {estabelecimento} — {periodo}"
+
+
+selected_id = st.selectbox(
+    "Selecione o ID",
+    ids,
+    format_func=formatar_conciliacao
+)
 
 
             if selected_id:
