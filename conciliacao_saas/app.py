@@ -176,6 +176,30 @@ def inject_css():
 
 
 /* ========================================================
+   SELECTBOX - VISUAL CLARO
+   ======================================================== */
+
+.stSelectbox [data-baseweb="select"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 0.5rem !important;
+}
+
+.stSelectbox [data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+.stSelectbox [data-baseweb="select"] span {
+    color: #1f2937 !important;
+}
+
+.stSelectbox [data-baseweb="select"] svg {
+    fill: #374151 !important;
+}
+
+
+/* ========================================================
    CODE BLOCK - CONTA CONTÁBIL
    ======================================================== */
 
