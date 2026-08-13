@@ -1273,7 +1273,7 @@ with st.sidebar:
     # NOVA CONCILIAÇÃO
     # ========================================================
 
-    if pagina == "Nova Conciliação":
+if pagina == "Nova Conciliação":
 
         st.subheader("Nova Conciliação")
 
