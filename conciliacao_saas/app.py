@@ -3,7 +3,7 @@ SaaS de Conciliação - Conta 91001001 TRANSITÓRIA DE FORNECEDORES
 Protótipo Streamlit (Opção A)
 """
 
-import streamlit as st
+import streamlit as st7
 import pandas as pd
 import numpy as np
 from datetime import datetime, date
@@ -1775,7 +1775,7 @@ if pagina == "Nova Conciliação":
     # HISTÓRICO
     # ========================================================
 
-    else:
+        else:
 
         st.subheader(
             "📜 Histórico de Conciliações"
