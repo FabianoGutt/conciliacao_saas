@@ -1807,126 +1807,116 @@ def main():
 
 
             st.markdown(
-                "### Detalhes de uma conciliação"
+            "### Detalhes de uma conciliação"
+        )
+
+        ids = hist["id"].tolist()
+
+        def formatar_conciliacao(x):
+            linha = hist[hist["id"] == x].iloc[0]
+
+            estabelecimento = linha["estabelecimento"]
+            periodo = linha["periodo"]
+
+            return (
+                f"#{x} — "
+                f"{estabelecimento} — "
+                f"{periodo}"
             )
 
+        selected_id = st.selectbox(
+            "Selecione o ID",
+            ids,
+            format_func=formatar_conciliacao
+        )
 
-            ids = hist["id"].tolist()
+        if selected_id:
 
+            row = hist[
+                hist["id"] == selected_id
+            ].iloc[0]
 
-            ids = hist["id"].tolist()
+            st.markdown(
+                f"""
+                **Estabelecimento:** {row['estabelecimento']}  
+                **Período:** {row['periodo']}  
+                **Executado em:** {row['data_execucao']}  
+                **Status:** {row['status']}  
+                **Observação:** {row['observacao'] or '-'}
+                """
+            )
 
+            divs = carregar_divergencias(
+                selected_id
+            )
 
-def formatar_conciliacao(x):
-    linha = hist[hist["id"] == x].iloc[0]
+            if divs.empty:
 
-    estabelecimento = linha["estabelecimento"]
-    periodo = linha["periodo"]
+                st.success(
+                    "Sem divergências nesta conciliação."
+                )
 
-    return f"#{x} — {estabelecimento} — {periodo}"
-
-
-selected_id = st.selectbox(
-    "Selecione o ID",
-    ids,
-    format_func=formatar_conciliacao
-)
-
-
-            if selected_id:
-
-                row = hist[
-                    hist["id"] == selected_id
-                ].iloc[0]
-
+            else:
 
                 st.markdown(
-                    f"""
-                    **Estabelecimento:** {row['estabelecimento']}  
-                    **Período:** {row['periodo']}  
-                    **Executado em:** {row['data_execucao']}  
-                    **Status:** {row['status']}  
-                    **Observação:** {row['observacao'] or '-'}
-                    """
+                    f"**{len(divs)} divergência(s):**"
                 )
 
+                for col in [
+                    "data_financeiro",
+                    "data_recebimento"
+                ]:
 
-                divs = carregar_divergencias(
-                    selected_id
-                )
+                    if col in divs.columns:
 
-
-                if divs.empty:
-
-                    st.success(
-                        "Sem divergências nesta conciliação."
-                    )
-
-                else:
-
-                    st.markdown(
-                        f"**{len(divs)} divergência(s):**"
-                    )
-
-
-                    for col in [
-                        "data_financeiro",
-                        "data_recebimento"
-                    ]:
-
-                        if col in divs.columns:
-
-                            divs[col] = (
-                                pd.to_datetime(
-                                    divs[col],
-                                    errors="coerce"
-                                )
-                                .dt.strftime(
-                                    "%d/%m/%Y"
-                                )
+                        divs[col] = (
+                            pd.to_datetime(
+                                divs[col],
+                                errors="coerce"
                             )
-
-
-                    st.dataframe(
-                        divs.drop(
-                            columns=[
-                                "id",
-                                "conciliacao_id"
-                            ],
-                            errors="ignore"
-                        ),
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-
-                    buffer = io.BytesIO()
-
-                    with pd.ExcelWriter(
-                        buffer,
-                        engine="openpyxl"
-                    ) as writer:
-
-                        divs.to_excel(
-                            writer,
-                            index=False,
-                            sheet_name="Divergencias"
+                            .dt.strftime(
+                                "%d/%m/%Y"
+                            )
                         )
 
+                st.dataframe(
+                    divs.drop(
+                        columns=[
+                            "id",
+                            "conciliacao_id"
+                        ],
+                        errors="ignore"
+                    ),
+                    use_container_width=True,
+                    hide_index=True
+                )
 
-                    st.download_button(
-                        "⬇️ Baixar divergências desta conciliação",
-                        data=buffer.getvalue(),
-                        file_name=(
-                            f"historico_divergencias_"
-                            f"id{selected_id}.xlsx"
-                        ),
-                        mime=(
-                            "application/"
-                            "vnd.openxmlformats-officedocument."
-                            "spreadsheetml.sheet"
-                        )
+                buffer = io.BytesIO()
+
+                with pd.ExcelWriter(
+                    buffer,
+                    engine="openpyxl"
+                ) as writer:
+
+                    divs.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Divergencias"
                     )
+
+                st.download_button(
+                    "⬇️ Baixar divergências desta conciliação",
+                    data=buffer.getvalue(),
+                    file_name=(
+                        f"historico_divergencias_"
+                        f"id{selected_id}.xlsx"
+                    ),
+                    mime=(
+                        "application/"
+                        "vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    )
+                )
 
 
 # ============================================================
