@@ -147,6 +147,31 @@ def inject_css():
     }
 
 
+/* ========================================================
+   CODE BLOCK - CONTA CONTÁBIL
+   ======================================================== */
+
+section[data-testid="stSidebar"] code,
+section[data-testid="stSidebar"] pre,
+section[data-testid="stSidebar"] pre code {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+
+section[data-testid="stSidebar"] pre {
+  background-color: #111827 !important;
+  border-radius: var(--radius) !important;
+  border: 1px solid #1f2937 !important;
+}
+
+section[data-testid="stSidebar"] pre code {
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 0.82rem !important;
+  line-height: 1.6 !important;
+  color: #f9fafb !important;
+}
+
+
     /* ========================================================
        SELECTBOX / INPUTS
        ======================================================== */
@@ -1790,14 +1815,22 @@ def main():
 
 
             selected_id = st.selectbox(
-    "Selecione o ID",
-    ids,
-    format_func=lambda x: (
-        f"#{x} — "
-        f"{hist.loc[hist['id'] == x, 'estabelecimento'].values[0]} — "
-        f"{hist.loc[hist['id'] == x, 'periodo'].values[0]}"
-    )
-)
+                "Selecione o ID",
+                ids,
+                format_func=lambda x:
+                    (
+                        f"#{x} — "
+                        f"{hist.loc["
+                            hist['id'] == x,
+                            'estabelecimento'
+                        ].values[0]}"
+                        f" — "
+                        f"{hist.loc["
+                            hist['id'] == x,
+                            'periodo'
+                        ].values[0]}"
+                    )
+            )
 
 
             if selected_id:
