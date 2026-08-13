@@ -30,6 +30,183 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 ESTABELECIMENTOS = ["101", "103", "104", "106"]
 
 # ============================================================
+# TEMA VISUAL (UX/UI)
+# ============================================================
+def inject_css():
+    """Aplica tema verde/azul claro e estilos de tabela."""
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    :root {
+      --primary: #22c55e;
+      --primary-dark: #16a34a;
+      --destructive: #ef4444;
+      --warning: #f59e0b;
+      --info: #3b82f6;
+      --background: #f0f8ff;
+      --card: #ffffff;
+      --foreground: #374151;
+      --muted: #f3f4f6;
+      --muted-fg: #6b7280;
+      --border: #e5e7eb;
+      --sidebar-bg: #e0f2fe;
+      --accent: #d1fae5;
+      --radius: 0.5rem;
+    }
+
+    html, body, [class*="css"] {
+      font-family: 'DM Sans', sans-serif;
+      color: var(--foreground);
+    }
+
+    .stApp {
+      background: linear-gradient(180deg, #f0f8ff 0%, #e8f4fc 100%);
+    }
+
+    section[data-testid="stSidebar"] {
+      background: var(--sidebar-bg) !important;
+      border-right: 1px solid var(--border);
+    }
+    section[data-testid="stSidebar"] * {
+      color: var(--foreground) !important;
+    }
+
+    .stButton > button[kind="primary"],
+    .stButton > button {
+      background: var(--primary) !important;
+      color: #fff !important;
+      border: none !important;
+      border-radius: var(--radius) !important;
+      font-weight: 600 !important;
+      padding: 0.6rem 1.2rem !important;
+      box-shadow: 0 4px 8px rgba(34, 197, 94, 0.25) !important;
+      transition: all 0.15s ease !important;
+    }
+    .stButton > button:hover {
+      background: var(--primary-dark) !important;
+      box-shadow: 0 6px 12px rgba(34, 197, 94, 0.35) !important;
+    }
+
+    div[data-testid="stMetric"] {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+    }
+    div[data-testid="stMetric"] label {
+      color: var(--muted-fg) !important;
+      font-weight: 500 !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+      color: var(--foreground) !important;
+      font-weight: 700 !important;
+    }
+
+    section[data-testid="stFileUploader"] {
+      background: var(--card);
+      border: 1px dashed #86efac;
+      border-radius: var(--radius);
+      padding: 0.75rem;
+    }
+
+    .stTextInput input, .stSelectbox > div > div, .stNumberInput input {
+      border-radius: var(--radius) !important;
+      border-color: var(--border) !important;
+    }
+
+    h1, h2, h3 {
+      color: var(--foreground) !important;
+      font-weight: 700 !important;
+    }
+
+    div[data-testid="stAlert"] {
+      border-radius: var(--radius) !important;
+    }
+
+    div[data-testid="stDataFrame"] {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+      background: var(--card);
+    }
+
+    .stDownloadButton > button {
+      background: #e0f2fe !important;
+      color: #0369a1 !important;
+      border: 1px solid #bae6fd !important;
+      border-radius: var(--radius) !important;
+      font-weight: 600 !important;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .badge-fin { background: #fee2e2; color: #b91c1c; }
+    .badge-rec { background: #dbeafe; color: #1d4ed8; }
+    .badge-diff { background: #fef3c7; color: #b45309; }
+    .badge-ok { background: #d1fae5; color: #047857; }
+
+    .card-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+      margin-bottom: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def estilo_divergencias(df: pd.DataFrame):
+    """Aplica cores por tipo de divergência na tabela."""
+    if df is None or df.empty:
+        return df
+
+    work = df.copy()
+
+    def cor_linha(row):
+        tipo = str(row.get("Tipo", ""))
+        if tipo == "Só no Financeiro":
+            return ["background-color: #fee2e2; color: #7f1d1d"] * len(row)
+        if tipo == "Só no Recebimento":
+            return ["background-color: #dbeafe; color: #1e3a8a"] * len(row)
+        if tipo == "Valor Diferente":
+            return ["background-color: #fef3c7; color: #78350f"] * len(row)
+        return [""] * len(row)
+
+    styler = work.style.apply(cor_linha, axis=1)
+    styler = styler.set_properties(**{
+        "font-family": "IBM Plex Mono, monospace",
+        "font-size": "0.85rem",
+        "border-color": "#e5e7eb",
+    })
+    styler = styler.set_table_styles([
+        {"selector": "th", "props": [
+            ("background-color", "#22c55e"),
+            ("color", "#ffffff"),
+            ("font-weight", "600"),
+            ("font-family", "DM Sans, sans-serif"),
+            ("padding", "0.6rem 0.75rem"),
+            ("border", "none"),
+        ]},
+        {"selector": "td", "props": [
+            ("padding", "0.5rem 0.75rem"),
+            ("border-bottom", "1px solid #e5e7eb"),
+        ]},
+    ])
+    return styler
+
+
+# ============================================================
 # BANCO DE DADOS (Histórico)
 # ============================================================
 def init_db():
@@ -145,12 +322,6 @@ def carregar_divergencias(conciliacao_id: int):
 # FUNÇÕES DE NORMALIZAÇÃO E COMPARAÇÃO
 # ============================================================
 def normalizar_serie(s):
-    """Normaliza série para comparação consistente.
-    Remove espaços, zeros à esquerda e zeros à direita de séries numéricas
-    (700/70000 → 7; 900/9 → 9). Séries alfanuméricas (ex: S) são apenas
-    limpas. Observação: séries como 10 viram 1 — no contexto atual das
-    planilhas isso não gera falso positivo relevante.
-    """
     if pd.isna(s) or s is None:
         return ""
     s = str(s).strip().upper()
@@ -171,7 +342,6 @@ def normalizar_serie(s):
     return s
 
 def normalizar_documento(d):
-    """Remove zeros à esquerda do documento."""
     if pd.isna(d) or d is None:
         return ""
     s = str(d).strip()
@@ -179,7 +349,6 @@ def normalizar_documento(d):
     return s
 
 def _encontrar_linha_cabecalho(df_raw: pd.DataFrame, palavras_chave: list) -> int:
-    """Procura a linha que contém o cabeçalho real (quando há títulos acima)."""
     for i in range(min(30, len(df_raw))):
         row_vals = [str(v).lower().strip() for v in df_raw.iloc[i].tolist()]
         row_text = " | ".join(row_vals)
@@ -190,7 +359,6 @@ def _encontrar_linha_cabecalho(df_raw: pd.DataFrame, palavras_chave: list) -> in
 
 
 def _mapear_colunas(df: pd.DataFrame, tipo: str) -> dict:
-    """Mapeia colunas de forma flexível (aceita variações de nome)."""
     col_map = {}
     for col in df.columns:
         col_lower = str(col).lower().strip()
@@ -209,7 +377,7 @@ def _mapear_colunas(df: pd.DataFrame, tipo: str) -> dict:
                     col_map["data"] = col
             elif any(x in col_lower for x in ["série", "serie", "series"]):
                 col_map["serie"] = col
-        else:  # recebimento
+        else:
             if "documento" in col_lower:
                 col_map["documento"] = col
             elif any(x in col_lower for x in ["crédito", "credito", "credito"]):
@@ -227,7 +395,6 @@ def _mapear_colunas(df: pd.DataFrame, tipo: str) -> dict:
 
 
 def _ler_excel_robusto(file_or_path, sheet_name=0) -> pd.DataFrame:
-    """Lê Excel tentando detectar a linha de cabeçalho automaticamente."""
     df = pd.read_excel(file_or_path, sheet_name=sheet_name, header=0)
     cols_str = " ".join(str(c).lower() for c in df.columns)
 
@@ -245,7 +412,6 @@ def _ler_excel_robusto(file_or_path, sheet_name=0) -> pd.DataFrame:
 
 
 def preparar_financeiro(df: pd.DataFrame) -> pd.DataFrame:
-    """Prepara planilha Financeiro."""
     col_map = _mapear_colunas(df, "financeiro")
 
     required = ["documento", "valor", "data"]
@@ -268,7 +434,6 @@ def preparar_financeiro(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def preparar_recebimento(df: pd.DataFrame) -> pd.DataFrame:
-    """Prepara planilha Recebimento."""
     col_map = _mapear_colunas(df, "recebimento")
 
     required = ["documento", "valor", "data"]
@@ -290,11 +455,6 @@ def preparar_recebimento(df: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 def conciliar(df_fin: pd.DataFrame, df_rec: pd.DataFrame, tolerancia: float = 0.02) -> dict:
-    """
-    Realiza a conciliação.
-    Chave única = Documento + Série
-    Duplicados são sumarizados.
-    """
     fin_agg = df_fin.groupby("Chave").agg(
         Documento=("Documento", "first"),
         Série=("Série", "first"),
@@ -370,6 +530,7 @@ def conciliar(df_fin: pd.DataFrame, df_rec: pd.DataFrame, tolerancia: float = 0.
 # ============================================================
 def main():
     init_db()
+    inject_css()
 
     st.title("⚖️ Conciliação Transitoria de Fornecedores")
     st.caption("Conta 91001001 • Estabelecimentos 101 / 103 / 104 / 106")
@@ -486,16 +647,25 @@ def main():
 
                     if resultado["qtd_divergencias"] > 0:
                         st.markdown("### ⚠️ Divergências encontradas")
-                        div = resultado["divergencias"].copy()
+                        st.markdown("🔴 **Só no Financeiro** &nbsp;&nbsp; 🔵 **Só no Recebimento** &nbsp;&nbsp; 🟡 **Valor Diferente**")
 
+                        div_show = resultado["divergencias"].copy()
                         for col in ["Data Financeiro", "Data Recebimento"]:
-                            if col in div.columns:
-                                div[col] = pd.to_datetime(div[col], errors="coerce").dt.strftime("%d/%m/%Y")
-                        for col in ["Valor Financeiro", "Valor Recebimento", "Diferença"]:
-                            if col in div.columns:
-                                div[col] = div[col].apply(lambda x: f"{x:,.2f}" if pd.notna(x) else "")
+                            if col in div_show.columns:
+                                div_show[col] = pd.to_datetime(div_show[col], errors="coerce").dt.strftime("%d/%m/%Y")
 
-                        st.dataframe(div, use_container_width=True, hide_index=True)
+                        for col in ["Valor Financeiro", "Valor Recebimento", "Diferença"]:
+                            if col in div_show.columns:
+                                div_show[col] = div_show[col].apply(
+                                    lambda x: f"R$ {x:,.2f}" if pd.notna(x) else ""
+                                )
+
+                        st.dataframe(
+                            estilo_divergencias(div_show),
+                            use_container_width=True,
+                            hide_index=True,
+                            height=min(420, 48 + len(div_show) * 36)
+                        )
 
                         buffer = io.BytesIO()
                         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
