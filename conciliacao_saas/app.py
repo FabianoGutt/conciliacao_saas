@@ -1235,7 +1235,7 @@ def main():
         "Conta 91001001 • Estabelecimentos 101 / 103 / 104 / 106"
     )
 
-        with st.sidebar:
+with st.sidebar:
 
         st.header("Navegação")
 
