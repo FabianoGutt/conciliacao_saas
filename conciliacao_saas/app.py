@@ -147,6 +147,34 @@ def inject_css():
     }
 
 
+    /* ========================================================
+   CONTA CONTÁBIL
+   ======================================================== */
+
+.conta-contabil {
+    background: #111827 !important;
+    border: 1px solid #1f2937 !important;
+    border-radius: 0.5rem !important;
+    padding: 0.8rem 0.9rem !important;
+    margin-top: 0.5rem !important;
+}
+
+.conta-numero {
+    color: #94a3b8 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    margin-bottom: 0.25rem !important;
+}
+
+.conta-descricao {
+    color: #ffffff !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+}
+
+
 /* ========================================================
    CODE BLOCK - CONTA CONTÁBIL
    ======================================================== */
@@ -1200,10 +1228,17 @@ def main():
 
         st.markdown("**Conta contábil**")
 
-        st.code(
-            "91001001\n"
-            "TRANSITORIA DE FORNECEDORES"
-        )
+st.markdown(
+    """
+    <div class="conta-contabil">
+        <div class="conta-numero">91001001</div>
+        <div class="conta-descricao">
+            TRANSITORIA DE FORNECEDORES
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
         st.markdown("---")
 
