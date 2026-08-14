@@ -12,6 +12,48 @@ import pandas as pd
 import streamlit as st
 
 
+
+# ============================================================
+# FORMATAÇÃO NUMÉRICA PT-BR
+# ============================================================
+
+def formatar_numero_br(valor):
+    if valor is None or pd.isna(valor):
+        return ""
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return ""
+    return (
+        f"{numero:,.2f}"
+        .replace(",", "X")
+        .replace(".", ",")
+        .replace("X", ".")
+    )
+
+
+def formatar_moeda_br(valor):
+    numero = formatar_numero_br(valor)
+    return f"R$ {numero}" if numero else ""
+
+
+def parse_numero_br(valor):
+    if valor is None:
+        return None
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        return float(valor)
+    texto = str(valor).strip()
+    if not texto:
+        return None
+    texto = texto.replace("R$", "").replace(" ", "")
+    if "," in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+    try:
+        return float(texto)
+    except ValueError:
+        return None
+
+
 # ============================================================
 # CONFIGURAÇÃO
 # ============================================================
@@ -719,7 +761,7 @@ def exibir_dashboard():
 
     m2.metric(
         "Taxa OK",
-        f"{taxa_ok:.1f}%",
+        f"{taxa_ok:.1f}".replace(".", ",") + "%",
     )
 
     m3.metric(
@@ -741,17 +783,17 @@ def exibir_dashboard():
 
     m6.metric(
         "Diferença acumulada",
-        f"R$ {diferenca_acumulada:,.2f}",
+        formatar_moeda_br(diferenca_acumulada),
     )
 
     m7.metric(
         "Média da diferença",
-        f"R$ {media_diferenca:,.2f}",
+        formatar_moeda_br(media_diferenca),
     )
 
     m8.metric(
         "Maior diferença",
-        f"R$ {maior_diferenca:,.2f}",
+        formatar_moeda_br(maior_diferenca),
     )
 
     # ========================================================
@@ -878,7 +920,7 @@ def exibir_dashboard():
     recentes["Diferença"] = recentes[
         "Diferença"
     ].apply(
-        lambda value: f"R$ {value:,.2f}"
+        lambda value: formatar_moeda_br(value)
     )
 
     st.dataframe(
@@ -904,7 +946,16 @@ def exibir_nova_conciliacao():
     with col2:
         periodo = st.text_input("Período (ex: 07/2026)", value=datetime.now().strftime("%m/%Y"))
     with col3:
-        tolerancia = st.number_input("Tolerância (R$)", min_value=0.0, value=0.02, step=0.01, format="%.2f")
+        tolerancia_texto = st.text_input(
+            "Tolerância (R$)",
+            value="0,02",
+            key="nova_tolerancia",
+            help="Use o formato brasileiro. Exemplos: 0,02 ou 1.234,56",
+        )
+        tolerancia = parse_numero_br(tolerancia_texto)
+        if tolerancia is None or tolerancia < 0:
+            st.error("Informe uma tolerância válida. Exemplo: 0,02")
+            return
 
     st.markdown("### Upload das planilhas")
     c1, c2 = st.columns(2)
@@ -1008,9 +1059,9 @@ def exibir_nova_conciliacao():
                 st.subheader("📊 Resultado da Conciliação")
 
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total Financeiro", f"R$ {resultado['total_financeiro']:,.2f}")
-                m2.metric("Total Recebimento", f"R$ {resultado['total_recebimento']:,.2f}")
-                m3.metric("Diferença", f"R$ {resultado['diferenca']:,.2f}", delta_color="inverse" if abs(resultado["diferenca"]) > tolerancia else "off")
+                m1.metric("Total Financeiro", formatar_moeda_br(resultado["total_financeiro"]))
+                m2.metric("Total Recebimento", formatar_moeda_br(resultado["total_recebimento"]))
+                m3.metric("Diferença", formatar_moeda_br(resultado["diferenca"]), delta_color="inverse" if abs(resultado["diferenca"]) > tolerancia else "off")
                 m4.metric("Divergências", resultado["qtd_divergencias"])
 
                 c1, c2, c3, c4 = st.columns(4)
@@ -1028,7 +1079,7 @@ def exibir_nova_conciliacao():
                             div_show[column] = pd.to_datetime(div_show[column], errors="coerce").dt.strftime("%d/%m/%Y")
                     for column in ["Valor Financeiro", "Valor Recebimento", "Diferença"]:
                         if column in div_show.columns:
-                            div_show[column] = div_show[column].apply(lambda x: f"R$ {x:,.2f}" if pd.notna(x) else "")
+                            div_show[column] = div_show[column].apply(lambda x: formatar_moeda_br(x) if pd.notna(x) else "")
                     st.dataframe(estilo_divergencias(div_show), use_container_width=True, hide_index=True, height=min(420, 48 + len(div_show) * 36))
 
                     buffer = io.BytesIO()
@@ -1277,7 +1328,7 @@ def exibir_historico():
     r1.metric("Conciliações encontradas", total_conciliacoes)
     r2.metric("Com divergências", total_com_divergencias)
     r3.metric("Divergências", total_divergencias)
-    r4.metric("Diferença acumulada", f"R$ {diferenca_acumulada:,.2f}")
+    r4.metric("Diferença acumulada", formatar_moeda_br(diferenca_acumulada))
 
     st.markdown("### Resultados")
 
@@ -1291,13 +1342,13 @@ def exibir_historico():
         .dt.strftime("%d/%m/%Y %H:%M")
     )
     hist_view["total_financeiro"] = hist_view["total_financeiro"].apply(
-        lambda x: f"R$ {x:,.2f}"
+        lambda x: formatar_moeda_br(x)
     )
     hist_view["total_recebimento"] = hist_view["total_recebimento"].apply(
-        lambda x: f"R$ {x:,.2f}"
+        lambda x: formatar_moeda_br(x)
     )
     hist_view["diferenca"] = hist_view["diferenca"].apply(
-        lambda x: f"R$ {x:,.2f}"
+        lambda x: formatar_moeda_br(x)
     )
 
     cols_show = [
