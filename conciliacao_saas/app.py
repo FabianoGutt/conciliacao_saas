@@ -64,6 +64,20 @@ def inject_css():
         .stApp div[data-testid="stCaptionContainer"],.stApp div[data-testid="stCaptionContainer"] p{color:var(--muted-fg)!important;}
 
         section[data-testid="stSidebar"]{background:var(--sidebar-bg)!important;border-right:1px solid var(--border)!important;}
+
+        /* Botão de fechar/abrir o sidebar */
+        button[data-testid="stSidebarCollapseButton"] {
+            color:#374151!important;
+        }
+        button[data-testid="stSidebarCollapseButton"] svg {
+            color:#374151!important;
+            fill:#374151!important;
+            stroke:#374151!important;
+        }
+        button[data-testid="stSidebarCollapseButton"]:hover {
+            color:#1f2937!important;
+            background-color:rgba(55,65,81,.08)!important;
+        }
         section[data-testid="stSidebar"] h1,section[data-testid="stSidebar"] h2,section[data-testid="stSidebar"] h3,
         section[data-testid="stSidebar"] p,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]{color:var(--foreground-dark)!important;}
 
