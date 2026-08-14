@@ -66,6 +66,49 @@ def inject_css():
         section[data-testid="stSidebar"]{background:var(--sidebar-bg)!important;border-right:1px solid var(--border)!important;}
 
         /* ========================================================
+   NAVEGAÇÃO DO SIDEBAR - RADIO
+   ======================================================== */
+
+        section[data-testid="stSidebar"] div[role="radiogroup"] {
+            gap: 0.35rem !important;
+        }
+        
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label {
+            background: #E0F2FE !important;
+            border: 1px solid #BAE6FD !important;
+            border-radius: 0.5rem !important;
+            padding: 0.55rem 0.75rem !important;
+            margin-bottom: 0.15rem !important;
+            transition: all 0.15s ease !important;
+        }
+        
+        /* Texto */
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label p,
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label span {
+            color: #374151 !important;
+            font-weight: 500 !important;
+        }
+        
+        /* Hover */
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+            background: #BAE6FD !important;
+            border-color: #93C5FD !important;
+        }
+        
+        /* Item selecionado */
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
+            background: #D1FAE5 !important;
+            border-color: #86EFAC !important;
+        }
+        
+        /* Texto do item selecionado */
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p,
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span {
+            color: #166534 !important;
+            font-weight: 600 !important;
+        }
+
+        /* ========================================================
    BOTÃO / ÍCONE DO SIDEBAR
    ======================================================== */
 
