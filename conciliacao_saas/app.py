@@ -65,82 +65,18 @@ def inject_css():
 
         section[data-testid="stSidebar"]{background:var(--sidebar-bg)!important;border-right:1px solid var(--border)!important;}
 
-        /* ========================================================
-   NAVEGAÇÃO DO SIDEBAR - RADIO
-   ======================================================== */
-
-        section[data-testid="stSidebar"] div[role="radiogroup"] {
-            gap: 0.35rem !important;
-        }
-        
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label {
-            background: #E0F2FE !important;
-            border: 1px solid #BAE6FD !important;
-            border-radius: 0.5rem !important;
-            padding: 0.55rem 0.75rem !important;
-            margin-bottom: 0.15rem !important;
-            transition: all 0.15s ease !important;
-        }
-        
-        /* Texto */
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label p,
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label span {
-            color: #374151 !important;
-            font-weight: 500 !important;
-        }
-        
-        /* Hover */
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
-            background: #BAE6FD !important;
-            border-color: #93C5FD !important;
-        }
-        
-        /* Item selecionado */
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
-            background: #D1FAE5 !important;
-            border-color: #86EFAC !important;
-        }
-        
-        /* Texto do item selecionado */
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p,
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span {
-            color: #166534 !important;
-            font-weight: 600 !important;
-        }
-
-        /* ========================================================
-   BOTÃO / ÍCONE DO SIDEBAR
-   ======================================================== */
-
-        /* Botão que contém o controle */
+        /* Botão de fechar/abrir o sidebar */
         button[data-testid="stSidebarCollapseButton"] {
-            color: #374151 !important;
-            background-color: transparent !important;
+            color:#374151!important;
         }
-        
-        /* Ícone Material Symbols Rounded */
-        button[data-testid="stSidebarCollapseButton"] * {
-            color: #374151 !important;
+        button[data-testid="stSidebarCollapseButton"] svg {
+            color:#374151!important;
+            fill:#374151!important;
+            stroke:#374151!important;
         }
-        
-        /* Classe específica do ícone identificada pelo F12 */
-        button[data-testid="stSidebarCollapseButton"] .st-emotion-cache-12bp31y {
-            color: #374151 !important;
-        }
-        
-        /* Caso o ícone esteja em elementos internos */
-        button[data-testid="stSidebarCollapseButton"] * {
-            color: #374151 !important;
-        }
-        
-        /* Hover */
         button[data-testid="stSidebarCollapseButton"]:hover {
-            background-color: rgba(55, 65, 81, 0.08) !important;
-        }
-        
-        button[data-testid="stSidebarCollapseButton"]:hover span,
-        button[data-testid="stSidebarCollapseButton"]:hover .st-emotion-cache-12bp31y {
-            color: #1f2937 !important;
+            color:#1f2937!important;
+            background-color:rgba(55,65,81,.08)!important;
         }
         section[data-testid="stSidebar"] h1,section[data-testid="stSidebar"] h2,section[data-testid="stSidebar"] h3,
         section[data-testid="stSidebar"] p,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]{color:var(--foreground-dark)!important;}
@@ -558,63 +494,313 @@ def estilo_divergencias(df):
 # DASHBOARD
 # ============================================================
 
+def _status_dashboard(row):
+    status = str(row.get("Status", ""))
+
+    if status == "OK":
+        return [
+            "background-color:#d1fae5; color:#047857; font-weight:600"
+        ] * len(row)
+
+    if status == "COM DIVERGÊNCIAS":
+        return [
+            "background-color:#fee2e2; color:#b91c1c; font-weight:600"
+        ] * len(row)
+
+    return [""] * len(row)
+
+
+def _preparar_dashboard_dados(hist: pd.DataFrame) -> pd.DataFrame:
+    dados = hist.copy()
+
+    dados["data_execucao"] = pd.to_datetime(
+        dados["data_execucao"],
+        errors="coerce",
+    )
+
+    for column in [
+        "qtd_divergencias",
+        "qtd_docs_financeiro",
+        "qtd_docs_recebimento",
+        "diferenca",
+    ]:
+        dados[column] = pd.to_numeric(
+            dados[column],
+            errors="coerce",
+        ).fillna(0)
+
+    return dados
+
+
 def exibir_dashboard():
     st.subheader("📊 Dashboard")
-    st.caption("Visão geral das conciliações realizadas")
+    st.caption("Visão gerencial das conciliações realizadas")
 
-    filtro_est = st.selectbox(
-        "Estabelecimento",
-        ["Todos"] + ESTABELECIMENTOS,
-        key="dashboard_estabelecimento",
+    # ========================================================
+    # FILTROS
+    # ========================================================
+
+    f1, f2 = st.columns(2)
+
+    with f1:
+        filtro_est = st.selectbox(
+            "Estabelecimento",
+            ["Todos"] + ESTABELECIMENTOS,
+            key="dashboard_estabelecimento",
+        )
+
+    with f2:
+        filtro_status = st.selectbox(
+            "Status",
+            [
+                "Todos",
+                "OK",
+                "COM DIVERGÊNCIAS",
+            ],
+            key="dashboard_status",
+        )
+
+    hist = listar_historico(
+        None if filtro_est == "Todos" else filtro_est
     )
 
-    hist = listar_historico(None if filtro_est == "Todos" else filtro_est)
+    if filtro_status != "Todos" and not hist.empty:
+        hist = hist[hist["status"] == filtro_status].copy()
 
     if hist.empty:
-        st.info("Nenhuma conciliação realizada ainda. Execute uma conciliação para começar a acompanhar os indicadores.")
+        st.info(
+            "Nenhuma conciliação encontrada para os filtros selecionados."
+        )
         return
 
-    total_conciliacoes = len(hist)
-    total_ok = int((hist["status"] == "OK").sum())
-    total_com_divergencias = int((hist["status"] == "COM DIVERGÊNCIAS").sum())
-    total_divergencias = int(hist["qtd_divergencias"].fillna(0).sum())
-    total_documentos = int(
-        hist["qtd_docs_financeiro"].fillna(0).sum()
-        + hist["qtd_docs_recebimento"].fillna(0).sum()
+    dados = _preparar_dashboard_dados(hist)
+
+    # ========================================================
+    # INDICADORES PRINCIPAIS
+    # ========================================================
+
+    total_conciliacoes = len(dados)
+    total_ok = int((dados["status"] == "OK").sum())
+    total_com_divergencias = int(
+        (dados["status"] == "COM DIVERGÊNCIAS").sum()
     )
-    diferenca_acumulada = float(hist["diferenca"].fillna(0).sum())
+    total_divergencias = int(
+        dados["qtd_divergencias"].sum()
+    )
+
+    taxa_ok = (
+        (total_ok / total_conciliacoes) * 100
+        if total_conciliacoes
+        else 0
+    )
+
+    total_documentos = int(
+        dados["qtd_docs_financeiro"].sum()
+        + dados["qtd_docs_recebimento"].sum()
+    )
+
+    diferenca_acumulada = float(
+        dados["diferenca"].sum()
+    )
+
+    media_diferenca = float(
+        dados["diferenca"].abs().mean()
+    )
+
+    maior_diferenca = float(
+        dados["diferenca"].abs().max()
+    )
+
+    ultima_data = dados["data_execucao"].max()
+    ultima_conciliacao = (
+        ultima_data.strftime("%d/%m/%Y %H:%M")
+        if pd.notna(ultima_data)
+        else "-"
+    )
+
+    # ========================================================
+    # CARDS PRINCIPAIS
+    # ========================================================
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Conciliações", total_conciliacoes)
-    m2.metric("Sem divergências", total_ok)
-    m3.metric("Com divergências", total_com_divergencias)
-    m4.metric("Divergências", total_divergencias)
 
-    m5, m6 = st.columns(2)
-    m5.metric("Documentos analisados", total_documentos)
-    m6.metric("Diferença acumulada", f"R$ {diferenca_acumulada:,.2f}")
+    m1.metric(
+        "Conciliações",
+        total_conciliacoes,
+    )
+
+    m2.metric(
+        "Taxa OK",
+        f"{taxa_ok:.1f}%",
+    )
+
+    m3.metric(
+        "Com divergências",
+        total_com_divergencias,
+    )
+
+    m4.metric(
+        "Total de divergências",
+        total_divergencias,
+    )
+
+    m5, m6, m7, m8 = st.columns(4)
+
+    m5.metric(
+        "Documentos analisados",
+        total_documentos,
+    )
+
+    m6.metric(
+        "Diferença acumulada",
+        f"R$ {diferenca_acumulada:,.2f}",
+    )
+
+    m7.metric(
+        "Média da diferença",
+        f"R$ {media_diferenca:,.2f}",
+    )
+
+    m8.metric(
+        "Maior diferença",
+        f"R$ {maior_diferenca:,.2f}",
+    )
+
+    # ========================================================
+    # RESUMO OPERACIONAL
+    # ========================================================
+
+    st.markdown("### Resumo operacional")
+
+    resumo_col1, resumo_col2 = st.columns(2)
+
+    with resumo_col1:
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+                <div class="dashboard-label">Última conciliação</div>
+                <div class="dashboard-value">{ultima_conciliacao}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with resumo_col2:
+        estabelecimento_resumo = (
+            "Todos"
+            if filtro_est == "Todos"
+            else filtro_est
+        )
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+                <div class="dashboard-label">Visão atual</div>
+                <div class="dashboard-value">Estabelecimento {estabelecimento_resumo}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # ========================================================
+    # CONCILIAÇÕES POR ESTABELECIMENTO
+    # ========================================================
+
+    st.markdown("### Conciliações por estabelecimento")
+
+    por_estabelecimento = (
+        dados.groupby("estabelecimento")
+        .size()
+        .rename("Conciliações")
+        .sort_values(ascending=False)
+    )
+
+    st.bar_chart(
+        por_estabelecimento,
+        height=250,
+    )
+
+    # ========================================================
+    # EVOLUÇÃO MENSAL
+    # ========================================================
+
+    st.markdown("### Evolução mensal")
+
+    evolucao = dados.dropna(
+        subset=["data_execucao"]
+    ).copy()
+
+    if not evolucao.empty:
+        evolucao["Mês"] = (
+            evolucao["data_execucao"]
+            .dt.to_period("M")
+            .astype(str)
+        )
+
+        evolucao_mensal = (
+            evolucao.groupby("Mês")
+            .size()
+            .rename("Conciliações")
+            .sort_index()
+        )
+
+        st.line_chart(
+            evolucao_mensal,
+            height=250,
+        )
+
+    # ========================================================
+    # ÚLTIMAS CONCILIAÇÕES
+    # ========================================================
 
     st.markdown("### Últimas conciliações")
 
-    recentes = hist.head(10).copy()
-    recentes["data_execucao"] = pd.to_datetime(recentes["data_execucao"], errors="coerce").dt.strftime("%d/%m/%Y %H:%M")
+    recentes = dados.sort_values(
+        "data_execucao",
+        ascending=False,
+    ).head(10).copy()
+
+    recentes["data_execucao"] = recentes[
+        "data_execucao"
+    ].dt.strftime("%d/%m/%Y %H:%M")
+
     recentes = recentes[
         [
-            "id", "estabelecimento", "periodo", "data_execucao",
-            "diferenca", "qtd_divergencias", "status",
+            "id",
+            "estabelecimento",
+            "periodo",
+            "data_execucao",
+            "diferenca",
+            "qtd_divergencias",
+            "status",
         ]
     ]
-    recentes = recentes.rename(columns={
-        "id": "ID",
-        "estabelecimento": "Estabelecimento",
-        "periodo": "Período",
-        "data_execucao": "Executado em",
-        "diferenca": "Diferença",
-        "qtd_divergencias": "Divergências",
-        "status": "Status",
-    })
-    recentes["Diferença"] = recentes["Diferença"].apply(lambda x: f"R$ {x:,.2f}")
-    st.dataframe(recentes, use_container_width=True, hide_index=True)
+
+    recentes = recentes.rename(
+        columns={
+            "id": "ID",
+            "estabelecimento": "Estabelecimento",
+            "periodo": "Período",
+            "data_execucao": "Executado em",
+            "diferenca": "Diferença",
+            "qtd_divergencias": "Divergências",
+            "status": "Status",
+        }
+    )
+
+    recentes["Diferença"] = recentes[
+        "Diferença"
+    ].apply(
+        lambda value: f"R$ {value:,.2f}"
+    )
+
+    st.dataframe(
+        recentes.style.apply(
+            _status_dashboard,
+            axis=1,
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 # ============================================================
