@@ -1,6 +1,6 @@
 """
 SaaS de Conciliação - Conta 91001001 TRANSITÓRIA DE FORNECEDORES
-Streamlit V2 - Dashboard + Nova Conciliação + Histórico
+Streamlit V3 - Dashboard + Nova Conciliação + Histórico Avançado
 """
 
 import io
@@ -65,45 +65,6 @@ def inject_css():
 
         section[data-testid="stSidebar"]{background:var(--sidebar-bg)!important;border-right:1px solid var(--border)!important;}
 
-/* ========================================================
-NAVEGAÇÃO DO SIDEBAR - RADIO
-======================================================== */
-
-        section[data-testid="stSidebar"] div[role="radiogroup"] {
-            gap: 0.35rem !important;
-        }
-        
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label {
-            background: #E0F2FE !important;
-            border: 1px solid #BAE6FD !important;
-            border-radius: 0.5rem !important;
-            padding: 0.55rem 0.75rem !important;
-            margin-bottom: 0.15rem !important;
-            transition: all 0.15s ease !important;
-        }
-        
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label p,
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label span {
-            color: #374151 !important;
-            font-weight: 500 !important;
-        }
-        
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
-            background: #BAE6FD !important;
-            border-color: #93C5FD !important;
-        }
-        
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
-            background: #D1FAE5 !important;
-            border-color: #86EFAC !important;
-        }
-        
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p,
-        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span {
-            color: #166534 !important;
-            font-weight: 600 !important;
-        }
-
         /* Botão de fechar/abrir o sidebar */
         button[data-testid="stSidebarCollapseButton"] {
             color:#374151!important;
@@ -116,6 +77,39 @@ NAVEGAÇÃO DO SIDEBAR - RADIO
         button[data-testid="stSidebarCollapseButton"]:hover {
             color:#1f2937!important;
             background-color:rgba(55,65,81,.08)!important;
+        }
+
+        /* ========================================================
+           NAVEGAÇÃO DO SIDEBAR - RADIO
+           ======================================================== */
+        section[data-testid="stSidebar"] div[role="radiogroup"] {
+            gap:0.35rem!important;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label {
+            background:#E0F2FE!important;
+            border:1px solid #BAE6FD!important;
+            border-radius:0.5rem!important;
+            padding:0.55rem 0.75rem!important;
+            margin-bottom:0.15rem!important;
+            transition:all 0.15s ease!important;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label p,
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label span {
+            color:#374151!important;
+            font-weight:500!important;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+            background:#BAE6FD!important;
+            border-color:#93C5FD!important;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
+            background:#D1FAE5!important;
+            border-color:#86EFAC!important;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) p,
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) span {
+            color:#166534!important;
+            font-weight:600!important;
         }
         section[data-testid="stSidebar"] h1,section[data-testid="stSidebar"] h2,section[data-testid="stSidebar"] h3,
         section[data-testid="stSidebar"] p,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]{color:var(--foreground-dark)!important;}
@@ -976,63 +970,264 @@ def exibir_nova_conciliacao():
 # HISTÓRICO
 # ============================================================
 
+def consultar_historico_avancado(estabelecimento="Todos", status="Todos", busca="", periodo_inicio=None, periodo_fim=None):
+    conn = sqlite3.connect(DB_PATH)
+
+    query = "SELECT * FROM conciliacoes WHERE 1=1"
+    params = []
+
+    if estabelecimento and estabelecimento != "Todos":
+        query += " AND estabelecimento = ?"
+        params.append(estabelecimento)
+
+    if status and status != "Todos":
+        query += " AND status = ?"
+        params.append(status)
+
+    query += " ORDER BY data_execucao DESC"
+
+    hist = pd.read_sql_query(query, conn, params=params)
+
+    if not hist.empty:
+        hist["data_execucao_dt"] = pd.to_datetime(hist["data_execucao"], errors="coerce")
+
+        if periodo_inicio is not None:
+            inicio = pd.Timestamp(periodo_inicio)
+            hist = hist[hist["data_execucao_dt"].dt.date >= inicio.date()]
+
+        if periodo_fim is not None:
+            fim = pd.Timestamp(periodo_fim) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            hist = hist[hist["data_execucao_dt"] <= fim]
+
+    busca = (busca or "").strip()
+
+    if busca and not hist.empty:
+        busca_lower = busca.lower()
+        mask = (
+            hist["id"].astype(str).str.contains(busca, case=False, na=False)
+            | hist["estabelecimento"].astype(str).str.contains(busca, case=False, na=False)
+            | hist["periodo"].astype(str).str.contains(busca, case=False, na=False)
+            | hist["observacao"].astype(str).str.contains(busca, case=False, na=False)
+        )
+
+        candidatos = hist.loc[mask, "id"].tolist()
+
+        # Busca também por documento/chave nas divergências.
+        if candidatos:
+            placeholders = ",".join("?" for _ in candidatos)
+            div_query = f"SELECT DISTINCT conciliacao_id FROM divergencias WHERE conciliacao_id IN ({placeholders}) AND (LOWER(documento) LIKE ? OR LOWER(chave) LIKE ?)"
+            like = f"%{busca_lower}%"
+            div_ids = pd.read_sql_query(div_query, conn, params=candidatos + [like, like])["conciliacao_id"].tolist()
+        else:
+            div_query = "SELECT DISTINCT conciliacao_id FROM divergencias WHERE LOWER(documento) LIKE ? OR LOWER(chave) LIKE ?"
+            like = f"%{busca_lower}%"
+            div_ids = pd.read_sql_query(div_query, conn, params=[like, like])["conciliacao_id"].tolist()
+
+        mask = mask | hist["id"].isin(div_ids)
+        hist = hist[mask]
+
+    if "data_execucao_dt" in hist.columns:
+        hist = hist.drop(columns=["data_execucao_dt"])
+
+    conn.close()
+    return hist.reset_index(drop=True)
+
+
 def exibir_historico():
     st.subheader("📜 Histórico de Conciliações")
 
-    filtro_est = st.selectbox("Filtrar por estabelecimento", ["Todos"] + ESTABELECIMENTOS, key="historico_estabelecimento")
-    hist = listar_historico(None if filtro_est == "Todos" else filtro_est)
+    # ========================================================
+    # FILTROS
+    # ========================================================
 
-    if hist.empty:
-        st.info("Nenhuma conciliação realizada ainda.")
+    f1, f2, f3 = st.columns(3)
+
+    with f1:
+        filtro_est = st.selectbox(
+            "Estabelecimento",
+            ["Todos"] + ESTABELECIMENTOS,
+            key="historico_estabelecimento",
+        )
+
+    with f2:
+        filtro_status = st.selectbox(
+            "Status",
+            ["Todos", "OK", "COM DIVERGÊNCIAS"],
+            key="historico_status",
+        )
+
+    with f3:
+        busca = st.text_input(
+            "🔎 Buscar ID, documento, chave ou observação",
+            placeholder="Ex.: 127, 123456, 123456|1",
+            key="historico_busca",
+        )
+
+    f4, f5 = st.columns(2)
+
+    with f4:
+        periodo_inicio = st.date_input(
+            "Período inicial",
+            value=None,
+            key="historico_periodo_inicio",
+        )
+
+    with f5:
+        periodo_fim = st.date_input(
+            "Período final",
+            value=None,
+            key="historico_periodo_fim",
+        )
+
+    if periodo_inicio and periodo_fim and periodo_inicio > periodo_fim:
+        st.warning("O período inicial não pode ser maior que o período final.")
         return
 
+    hist = consultar_historico_avancado(
+        estabelecimento=filtro_est,
+        status=filtro_status,
+        busca=busca,
+        periodo_inicio=periodo_inicio,
+        periodo_fim=periodo_fim,
+    )
+
+    # ========================================================
+    # RESUMO DOS FILTROS
+    # ========================================================
+
+    if hist.empty:
+        st.info("Nenhuma conciliação encontrada com os filtros informados.")
+        return
+
+    total_conciliacoes = len(hist)
+    total_com_divergencias = int((hist["status"] == "COM DIVERGÊNCIAS").sum())
+    total_divergencias = int(hist["qtd_divergencias"].fillna(0).sum())
+    diferenca_acumulada = float(hist["diferenca"].fillna(0).sum())
+
+    r1, r2, r3, r4 = st.columns(4)
+    r1.metric("Conciliações encontradas", total_conciliacoes)
+    r2.metric("Com divergências", total_com_divergencias)
+    r3.metric("Divergências", total_divergencias)
+    r4.metric("Diferença acumulada", f"R$ {diferenca_acumulada:,.2f}")
+
+    st.markdown("### Resultados")
+
+    # ========================================================
+    # TABELA
+    # ========================================================
+
     hist_view = hist.copy()
-    hist_view["data_execucao"] = pd.to_datetime(hist_view["data_execucao"], errors="coerce").dt.strftime("%d/%m/%Y %H:%M")
+    hist_view["data_execucao"] = pd.to_datetime(
+        hist_view["data_execucao"], errors="coerce"
+    ).dt.strftime("%d/%m/%Y %H:%M")
     hist_view["total_financeiro"] = hist_view["total_financeiro"].apply(lambda x: f"R$ {x:,.2f}")
     hist_view["total_recebimento"] = hist_view["total_recebimento"].apply(lambda x: f"R$ {x:,.2f}")
     hist_view["diferenca"] = hist_view["diferenca"].apply(lambda x: f"R$ {x:,.2f}")
 
     cols_show = [
-        "id", "estabelecimento", "periodo", "data_execucao",
-        "total_financeiro", "total_recebimento", "diferenca",
-        "qtd_divergencias", "status", "observacao",
+        "id",
+        "estabelecimento",
+        "periodo",
+        "data_execucao",
+        "total_financeiro",
+        "total_recebimento",
+        "diferenca",
+        "qtd_divergencias",
+        "status",
+        "observacao",
     ]
-    st.dataframe(hist_view[cols_show], use_container_width=True, hide_index=True)
+
+    tabela = hist_view[cols_show].rename(
+        columns={
+            "id": "ID",
+            "estabelecimento": "Estabelecimento",
+            "periodo": "Período",
+            "data_execucao": "Executado em",
+            "total_financeiro": "Total Financeiro",
+            "total_recebimento": "Total Recebimento",
+            "diferenca": "Diferença",
+            "qtd_divergencias": "Divergências",
+            "status": "Status",
+            "observacao": "Observação",
+        }
+    )
+
+    st.dataframe(
+        tabela,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    # ========================================================
+    # DETALHES
+    # ========================================================
 
     st.markdown("### Detalhes de uma conciliação")
+
     ids = hist["id"].tolist()
 
     def formatar_conciliacao(conciliacao_id):
         linha = hist[hist["id"] == conciliacao_id].iloc[0]
-        return f"#{conciliacao_id} — {linha['estabelecimento']} — {linha['periodo']}"
+        status = linha["status"]
+        simbolo = "🟢" if status == "OK" else "🔴"
+        return (
+            f"#{conciliacao_id} — "
+            f"{linha['estabelecimento']} — "
+            f"{linha['periodo']} — "
+            f"{simbolo} {status}"
+        )
 
-    selected_id = st.selectbox("Selecione o ID", ids, format_func=formatar_conciliacao)
+    selected_id = st.selectbox(
+        "Selecione o ID",
+        ids,
+        format_func=formatar_conciliacao,
+        key="historico_selected_id",
+    )
 
     if selected_id:
         row = hist[hist["id"] == selected_id].iloc[0]
+
+        d1, d2, d3, d4 = st.columns(4)
+        d1.metric("Estabelecimento", row["estabelecimento"])
+        d2.metric("Período", row["periodo"])
+        d3.metric("Status", row["status"])
+        d4.metric("Divergências", int(row["qtd_divergencias"] or 0))
+
         st.markdown(
-            f"**Estabelecimento:** {row['estabelecimento']}  \n"
-            f"**Período:** {row['periodo']}  \n"
-            f"**Executado em:** {row['data_execucao']}  \n"
-            f"**Status:** {row['status']}  \n"
+            f"**Executado em:** {row['data_execucao']}  "
             f"**Observação:** {row['observacao'] or '-'}"
         )
 
         divs = carregar_divergencias(selected_id)
+
         if divs.empty:
             st.success("Sem divergências nesta conciliação.")
             return
 
         st.markdown(f"**{len(divs)} divergência(s):**")
+
         for column in ["data_financeiro", "data_recebimento"]:
             if column in divs.columns:
-                divs[column] = pd.to_datetime(divs[column], errors="coerce").dt.strftime("%d/%m/%Y")
+                divs[column] = pd.to_datetime(
+                    divs[column], errors="coerce"
+                ).dt.strftime("%d/%m/%Y")
 
-        st.dataframe(divs.drop(columns=["id", "conciliacao_id"], errors="ignore"), use_container_width=True, hide_index=True)
+        st.dataframe(
+            divs.drop(
+                columns=["id", "conciliacao_id"],
+                errors="ignore",
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
 
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            divs.to_excel(writer, index=False, sheet_name="Divergencias")
+            divs.to_excel(
+                writer,
+                index=False,
+                sheet_name="Divergencias",
+            )
 
         st.download_button(
             "⬇️ Baixar divergências desta conciliação",
@@ -1073,7 +1268,7 @@ def main():
             unsafe_allow_html=True,
         )
         st.markdown("---")
-        st.caption("Versão 2.0 • Dashboard")
+        st.caption("Versão 3.0 • Dashboard + Histórico Avançado")
 
     if pagina == "Dashboard":
         exibir_dashboard()
