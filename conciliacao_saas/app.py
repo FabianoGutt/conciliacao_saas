@@ -1,6 +1,6 @@
 """
 SaaS de Conciliação - Conta 91001001 TRANSITÓRIA DE FORNECEDORES
-Streamlit V5 - Dashboard + Nova Conciliação + Histórico Avançado + Exclusão Segura
+Streamlit V6 - Dashboard + Nova Conciliação + Histórico Avançado + Exclusão Segura + Conciliação 2.0
 """
 
 import io
@@ -153,6 +153,11 @@ def inject_css():
         .dashboard-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.2rem;box-shadow:0 4px 8px rgba(0,0,0,.05);margin-bottom:1rem;}
         .dashboard-label{color:var(--muted-fg);font-size:.85rem;font-weight:500;}
         .dashboard-value{color:var(--foreground-dark);font-size:1.55rem;font-weight:700;margin-top:.2rem;}
+
+        .info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius);padding:0.9rem 1rem;margin:0.5rem 0 1rem 0;color:#1e3a8a;}
+        .info-box strong{color:#1e3a8a;}
+        .status-ok{color:#047857;font-weight:600;}
+        .status-warning{color:#b45309;font-weight:600;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -411,6 +416,8 @@ def preparar_recebimento(df):
 # ============================================================
 
 def conciliar(df_fin, df_rec, tolerancia=0.02):
+    # A chave oficial da conciliação continua sendo Documento + Série.
+    # Repetições de documento com séries diferentes são tratadas como operações distintas.
     fin_agg = df_fin.groupby("Chave").agg(
         Documento=("Documento", "first"),
         Série=("Série", "first"),
@@ -449,6 +456,15 @@ def conciliar(df_fin, df_rec, tolerancia=0.02):
         return "OK"
 
     merged["Tipo"] = merged.apply(classificar, axis=1)
+
+    # Diferença de data é apenas informativa e NÃO altera o status.
+    merged["Data_Diferente_Informativa"] = (
+        (merged["_merge"] == "both")
+        & merged["Data_Financeiro"].notna()
+        & merged["Data_Recebimento"].notna()
+        & (merged["Data_Financeiro"].dt.date != merged["Data_Recebimento"].dt.date)
+    )
+
     divergencias = merged[merged["Tipo"] != "OK"].copy()
     divergencias = divergencias.rename(columns={
         "Data_Financeiro": "Data Financeiro",
@@ -462,7 +478,38 @@ def conciliar(df_fin, df_rec, tolerancia=0.02):
         "Valor Financeiro", "Valor Recebimento", "Diferença", "Tipo",
     ]
     divergencias = divergencias[[c for c in cols_show if c in divergencias.columns]]
-    divergencias = divergencias.sort_values("Diferença", key=abs, ascending=False)
+    if not divergencias.empty:
+        divergencias = divergencias.sort_values("Diferença", key=abs, ascending=False)
+
+    # Lista separada apenas para informação sobre datas diferentes.
+    informacoes_data = merged[
+        merged["Data_Diferente_Informativa"]
+    ].copy()
+
+    informacoes_data = informacoes_data.rename(columns={
+        "Data_Financeiro": "Data Financeiro",
+        "Data_Recebimento": "Data Recebimento",
+    })
+
+    cols_data = [
+        "Documento",
+        "Série",
+        "Chave",
+        "Data Financeiro",
+        "Data Recebimento",
+        "Valor_Financeiro",
+        "Valor_Recebimento",
+        "Diferença",
+    ]
+    informacoes_data = informacoes_data[
+        [c for c in cols_data if c in informacoes_data.columns]
+    ]
+
+    if not informacoes_data.empty:
+        informacoes_data = informacoes_data.sort_values(
+            ["Data Financeiro", "Documento"],
+            ascending=[False, True],
+        )
 
     total_fin = df_fin["Valor"].sum()
     total_rec = df_rec["Valor"].sum()
@@ -470,15 +517,23 @@ def conciliar(df_fin, df_rec, tolerancia=0.02):
     return {
         "merged": merged,
         "divergencias": divergencias,
+        "informacoes_data": informacoes_data,
         "total_financeiro": round(total_fin, 2),
         "total_recebimento": round(total_rec, 2),
         "diferenca": round(total_fin - total_rec, 2),
         "qtd_docs_financeiro": len(fin_agg),
         "qtd_docs_recebimento": len(rec_agg),
+        "qtd_linhas_financeiro": len(df_fin),
+        "qtd_linhas_recebimento": len(df_rec),
+        "qtd_chaves_financeiro": df_fin["Chave"].nunique(),
+        "qtd_chaves_recebimento": df_rec["Chave"].nunique(),
+        "qtd_datas_invalidas_financeiro": int(df_fin["Data"].isna().sum()),
+        "qtd_datas_invalidas_recebimento": int(df_rec["Data"].isna().sum()),
         "qtd_divergencias": len(divergencias),
         "qtd_so_financeiro": len(divergencias[divergencias["Tipo"] == "Só no Financeiro"]),
         "qtd_so_recebimento": len(divergencias[divergencias["Tipo"] == "Só no Recebimento"]),
         "qtd_valor_diferente": len(divergencias[divergencias["Tipo"] == "Valor Diferente"]),
+        "qtd_datas_diferentes_informativas": len(informacoes_data),
         "qtd_ok": len(merged[merged["Tipo"] == "OK"]),
     }
 
@@ -887,6 +942,35 @@ def exibir_nova_conciliacao():
                         break
 
                 df_rec = preparar_recebimento(_ler_excel_robusto(file_rec, sheet_name=sheet_rec))
+
+                # ==================================================
+                # QUALIDADE DOS ARQUIVOS / PRÉ-CONFERÊNCIA
+                # ==================================================
+
+                fin_linhas = len(df_fin)
+                rec_linhas = len(df_rec)
+                fin_chaves = df_fin["Chave"].nunique()
+                rec_chaves = df_rec["Chave"].nunique()
+                fin_datas_invalidas = int(df_fin["Data"].isna().sum())
+                rec_datas_invalidas = int(df_rec["Data"].isna().sum())
+
+                st.markdown("### 🔎 Resumo dos arquivos processados")
+
+                q1, q2, q3, q4 = st.columns(4)
+                q1.metric("Linhas Financeiro", fin_linhas)
+                q2.metric("Linhas Recebimento", rec_linhas)
+                q3.metric("Chaves Financeiro", fin_chaves)
+                q4.metric("Chaves Recebimento", rec_chaves)
+
+                if fin_datas_invalidas or rec_datas_invalidas:
+                    st.warning(
+                        "Foram encontradas datas inválidas ou vazias: "
+                        f"Financeiro: {fin_datas_invalidas} • "
+                        f"Recebimento: {rec_datas_invalidas}."
+                    )
+                else:
+                    st.success("Datas válidas em todas as linhas processadas.")
+
                 resultado = conciliar(df_fin, df_rec, tolerancia=tolerancia)
 
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -959,7 +1043,24 @@ def exibir_nova_conciliacao():
                 else:
                     st.success("✅ Nenhuma divergência encontrada! Contas batem perfeitamente.")
 
-                st.info("🔑 A chave de comparação é **Documento + Série**. Documentos com a mesma numeração e séries diferentes são tratados como itens distintos.")
+                if resultado["qtd_datas_diferentes_informativas"] > 0:
+                    with st.expander(
+                        f"📅 Ver documentos com diferença de data ({resultado['qtd_datas_diferentes_informativas']})"
+                    ):
+                        data_show = resultado["informacoes_data"].copy()
+                        for column in ["Data Financeiro", "Data Recebimento"]:
+                            if column in data_show.columns:
+                                data_show[column] = pd.to_datetime(
+                                    data_show[column],
+                                    errors="coerce"
+                                ).dt.strftime("%d/%m/%Y")
+                        st.dataframe(
+                            data_show,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+                st.info("🔑 A chave de comparação é **Documento + Série**. Documentos com a mesma numeração e séries diferentes são tratados como itens distintos. Diferenças de data são apenas informativas e não geram divergência.")
 
             except Exception as error:
                 st.error(f"Erro ao processar: {error}")
@@ -1408,7 +1509,7 @@ def main():
             unsafe_allow_html=True,
         )
         st.markdown("---")
-        st.caption("Versão 5.0 • Dashboard + Histórico Avançado")
+        st.caption("Versão 6.0 • Conciliação 2.0 + Histórico Avançado")
 
     if pagina == "Dashboard":
         exibir_dashboard()
