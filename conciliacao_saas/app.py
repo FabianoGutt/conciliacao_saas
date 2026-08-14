@@ -68,12 +68,28 @@ def inject_css():
         /* ========================================================
    BOTÃO / ÍCONE DO SIDEBAR
    ======================================================== */
-                            
+
+        /* Botão que contém o controle */
+        button[data-testid="stSidebarCollapseButton"] {
+            color: #374151 !important;
+            background-color: transparent !important;
+        }
+        
+        /* Ícone Material Symbols Rounded */
+        button[data-testid="stSidebarCollapseButton"] * {
+            color: #374151 !important;
+        }
+        
         /* Classe específica do ícone identificada pelo F12 */
         button[data-testid="stSidebarCollapseButton"] .st-emotion-cache-12bp31y {
             color: #374151 !important;
-        }        
-               
+        }
+        
+        /* Caso o ícone esteja em elementos internos */
+        button[data-testid="stSidebarCollapseButton"] * {
+            color: #374151 !important;
+        }
+        
         /* Hover */
         button[data-testid="stSidebarCollapseButton"]:hover {
             background-color: rgba(55, 65, 81, 0.08) !important;
