@@ -1,6 +1,6 @@
 """
 SaaS de Conciliação - Conta 91001001 TRANSITÓRIA DE FORNECEDORES
-Streamlit V3 - Dashboard + Nova Conciliação + Histórico Avançado
+Streamlit V5 - Dashboard + Nova Conciliação + Histórico Avançado + Exclusão Segura
 """
 
 import io
@@ -1033,6 +1033,68 @@ def consultar_historico_avancado(estabelecimento="Todos", status="Todos", busca=
     return hist.reset_index(drop=True)
 
 
+
+# ============================================================
+# EXCLUSÃO DE CONCILIAÇÃO
+# ============================================================
+
+def excluir_conciliacao(conciliacao_id):
+    """Exclui a conciliação, divergências vinculadas e arquivos associados."""
+    conn = sqlite3.connect(DB_PATH)
+
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT arquivo_financeiro, arquivo_recebimento
+            FROM conciliacoes
+            WHERE id = ?
+            """,
+            (conciliacao_id,),
+        )
+        registro = cursor.fetchone()
+
+        if not registro:
+            return False
+
+        arquivo_financeiro, arquivo_recebimento = registro
+
+        cursor.execute(
+            "DELETE FROM divergencias WHERE conciliacao_id = ?",
+            (conciliacao_id,),
+        )
+
+        cursor.execute(
+            "DELETE FROM conciliacoes WHERE id = ?",
+            (conciliacao_id,),
+        )
+
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return False
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+    for nome_arquivo in (arquivo_financeiro, arquivo_recebimento):
+        if nome_arquivo:
+            caminho = UPLOAD_DIR / nome_arquivo
+            try:
+                if caminho.exists() and caminho.is_file():
+                    caminho.unlink()
+            except OSError:
+                pass
+
+    return True
+
+
 def exibir_historico():
     st.subheader("📜 Histórico de Conciliações")
 
@@ -1100,9 +1162,15 @@ def exibir_historico():
         return
 
     total_conciliacoes = len(hist)
-    total_com_divergencias = int((hist["status"] == "COM DIVERGÊNCIAS").sum())
-    total_divergencias = int(hist["qtd_divergencias"].fillna(0).sum())
-    diferenca_acumulada = float(hist["diferenca"].fillna(0).sum())
+    total_com_divergencias = int(
+        (hist["status"] == "COM DIVERGÊNCIAS").sum()
+    )
+    total_divergencias = int(
+        hist["qtd_divergencias"].fillna(0).sum()
+    )
+    diferenca_acumulada = float(
+        hist["diferenca"].fillna(0).sum()
+    )
 
     r1, r2, r3, r4 = st.columns(4)
     r1.metric("Conciliações encontradas", total_conciliacoes)
@@ -1117,12 +1185,19 @@ def exibir_historico():
     # ========================================================
 
     hist_view = hist.copy()
-    hist_view["data_execucao"] = pd.to_datetime(
-        hist_view["data_execucao"], errors="coerce"
-    ).dt.strftime("%d/%m/%Y %H:%M")
-    hist_view["total_financeiro"] = hist_view["total_financeiro"].apply(lambda x: f"R$ {x:,.2f}")
-    hist_view["total_recebimento"] = hist_view["total_recebimento"].apply(lambda x: f"R$ {x:,.2f}")
-    hist_view["diferenca"] = hist_view["diferenca"].apply(lambda x: f"R$ {x:,.2f}")
+    hist_view["data_execucao"] = (
+        pd.to_datetime(hist_view["data_execucao"], errors="coerce")
+        .dt.strftime("%d/%m/%Y %H:%M")
+    )
+    hist_view["total_financeiro"] = hist_view["total_financeiro"].apply(
+        lambda x: f"R$ {x:,.2f}"
+    )
+    hist_view["total_recebimento"] = hist_view["total_recebimento"].apply(
+        lambda x: f"R$ {x:,.2f}"
+    )
+    hist_view["diferenca"] = hist_view["diferenca"].apply(
+        lambda x: f"R$ {x:,.2f}"
+    )
 
     cols_show = [
         "id",
@@ -1198,6 +1273,63 @@ def exibir_historico():
             f"**Observação:** {row['observacao'] or '-'}"
         )
 
+        # ====================================================
+        # EXCLUSÃO SEGURA
+        # ====================================================
+
+        st.markdown("### Ações")
+
+        with st.expander(
+            "🗑️ Excluir esta conciliação",
+            expanded=False,
+        ):
+            st.warning(
+                f"A exclusão da conciliação #{selected_id} é permanente. "
+                "Serão removidas a conciliação, todas as divergências "
+                "vinculadas e os arquivos Excel associados, quando existirem."
+            )
+
+            with st.form(
+                f"form_exclusao_{selected_id}",
+                clear_on_submit=True,
+            ):
+                confirmar_exclusao = st.checkbox(
+                    "Confirmo que desejo excluir esta conciliação permanentemente.",
+                    key=f"confirmar_exclusao_{selected_id}",
+                )
+
+                excluir = st.form_submit_button(
+                    "🗑️ Excluir definitivamente",
+                    type="primary",
+                    use_container_width=True,
+                )
+
+            if excluir:
+                if not confirmar_exclusao:
+                    st.error("Marque a confirmação antes de excluir.")
+                else:
+                    try:
+                        sucesso = excluir_conciliacao(selected_id)
+
+                        if sucesso:
+                            st.success(
+                                f"Conciliação #{selected_id} excluída com sucesso."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(
+                                f"A conciliação #{selected_id} não foi encontrada."
+                            )
+
+                    except Exception as error:
+                        st.error(
+                            f"Não foi possível excluir a conciliação #{selected_id}: {error}"
+                        )
+
+        # ====================================================
+        # DIVERGÊNCIAS
+        # ====================================================
+
         divs = carregar_divergencias(selected_id)
 
         if divs.empty:
@@ -1206,11 +1338,15 @@ def exibir_historico():
 
         st.markdown(f"**{len(divs)} divergência(s):**")
 
-        for column in ["data_financeiro", "data_recebimento"]:
+        for column in [
+            "data_financeiro",
+            "data_recebimento",
+        ]:
             if column in divs.columns:
-                divs[column] = pd.to_datetime(
-                    divs[column], errors="coerce"
-                ).dt.strftime("%d/%m/%Y")
+                divs[column] = (
+                    pd.to_datetime(divs[column], errors="coerce")
+                    .dt.strftime("%d/%m/%Y")
+                )
 
         st.dataframe(
             divs.drop(
@@ -1233,7 +1369,11 @@ def exibir_historico():
             "⬇️ Baixar divergências desta conciliação",
             data=buffer.getvalue(),
             file_name=f"historico_divergencias_id{selected_id}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            mime=(
+                "application/"
+                "vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
         )
 
 
@@ -1268,7 +1408,7 @@ def main():
             unsafe_allow_html=True,
         )
         st.markdown("---")
-        st.caption("Versão 3.0 • Dashboard + Histórico Avançado")
+        st.caption("Versão 5.0 • Dashboard + Histórico Avançado")
 
     if pagina == "Dashboard":
         exibir_dashboard()
