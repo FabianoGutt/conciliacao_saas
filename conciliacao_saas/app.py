@@ -76,7 +76,7 @@ def inject_css():
         }
         
         /* Ícone Material Symbols Rounded */
-        button[data-testid="stSidebarCollapseButton"] span {
+        button[data-testid="stSidebarCollapseButton"] * {
             color: #374151 !important;
         }
         
