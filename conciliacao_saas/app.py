@@ -5,6 +5,7 @@ Sem autenticação nesta fase
 """
 
 import io
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -199,21 +200,44 @@ def _periodo_storage(periodo):
 
 
 def _upload_storage(file_bytes, caminho, content_type):
-    arquivo = io.BytesIO(file_bytes)
+    """Envia bytes para o Supabase Storage usando arquivo temporário.
 
-    return (
-        supabase.storage
-        .from_(STORAGE_BUCKET)
-        .upload(
-            path=caminho,
-            file=arquivo,
-            file_options={
-                "content-type": content_type,
-                "cache-control": "3600",
-                "upsert": "false",
-            },
+    A versão do storage3 utilizada pelo ambiente do Streamlit espera
+    um caminho de arquivo/PathLike no parâmetro `file` durante o upload.
+    Por isso gravamos temporariamente os bytes recebidos pelo Streamlit.
+    """
+    sufixo = Path(caminho).suffix or ".xlsx"
+    temp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=sufixo,
+            delete=False,
+        ) as temp_file:
+            temp_file.write(file_bytes)
+            temp_path = temp_file.name
+
+        return (
+            supabase.storage
+            .from_(STORAGE_BUCKET)
+            .upload(
+                path=caminho,
+                file=temp_path,
+                file_options={
+                    "content-type": content_type,
+                    "cache-control": "3600",
+                    "upsert": "false",
+                },
+            )
         )
-    )
+
+    finally:
+        if temp_path:
+            try:
+                Path(temp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _remover_storage(caminhos):
