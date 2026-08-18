@@ -765,9 +765,9 @@ def inject_css():
         .stButton>button:not([kind="primary"]) *{color:#0369a1!important;}
 
         div[data-testid="stMetric"]{background:#fff!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;padding:1rem 1.1rem!important;box-shadow:0 4px 8px rgba(0,0,0,.06)!important;}
-        div[data-testid="stMetric"] label{color:var(--muted-fg)!important;font-weight:500!important;}
-        div[data-testid="stMetric"] [data-testid="stMetricValue"]{color:var(--foreground-dark)!important;font-weight:700!important;}
-        div[data-testid="stMetric"] [data-testid="stMetricDelta"]{color:var(--muted-fg)!important;}
+        div[data-testid="stMetric"] label{color:var(--muted-fg)!important;font-size:0.78rem!important;font-weight:500!important;}
+        div[data-testid="stMetric"] [data-testid="stMetricValue"]{color:var(--foreground-dark)!important;font-size:1.35rem!important;line-height:1.2!important;font-weight:600!important;}
+        div[data-testid="stMetric"] [data-testid="stMetricDelta"]{color:var(--muted-fg)!important;font-size: 0.75rem !important;}
 
         div[data-testid="stAlert"]{border-radius:var(--radius)!important;}
         div[data-testid="stDataFrame"]{border:1px solid var(--border)!important;border-radius:var(--radius)!important;overflow:hidden;box-shadow:0 4px 8px rgba(0,0,0,.05)!important;background:#fff!important;}
