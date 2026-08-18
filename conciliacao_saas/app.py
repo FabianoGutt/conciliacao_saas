@@ -782,6 +782,56 @@ def inject_css():
         .info-box strong{color:#1e3a8a;}
         .status-ok{color:#047857;font-weight:600;}
         .status-warning{color:#b45309;font-weight:600;}
+        /* ========================================================
+           NAVEGAÇÃO DO SIDEBAR - RADIO / OVERRIDE V8.4
+           ======================================================== */
+        section[data-testid="stSidebar"] [role="radiogroup"] {
+            display:flex!important;
+            flex-direction:column!important;
+            gap:.35rem!important;
+        }
+
+        section[data-testid="stSidebar"] [role="radiogroup"] label {
+            display:flex!important;
+            align-items:center!important;
+            width:100%!important;
+            box-sizing:border-box!important;
+            background:#E0F2FE!important;
+            border:1px solid #BAE6FD!important;
+            border-radius:.5rem!important;
+            padding:.55rem .75rem!important;
+            margin:0!important;
+            color:#374151!important;
+            transition:background-color .15s ease,border-color .15s ease!important;
+        }
+
+        section[data-testid="stSidebar"] [role="radiogroup"] label:hover {
+            background:#BAE6FD!important;
+            border-color:#93C5FD!important;
+        }
+
+        section[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+            background:#D1FAE5!important;
+            border-color:#86EFAC!important;
+        }
+
+        section[data-testid="stSidebar"] [role="radiogroup"] label p,
+        section[data-testid="stSidebar"] [role="radiogroup"] label span {
+            color:#374151!important;
+            font-weight:500!important;
+        }
+
+        section[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p,
+        section[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) span {
+            color:#166534!important;
+            font-weight:600!important;
+        }
+
+        /* Garante que o radio nativo continue visível sem alterar o tema global */
+        section[data-testid="stSidebar"] [role="radiogroup"] input[type="radio"] {
+            accent-color:#22C55E!important;
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
